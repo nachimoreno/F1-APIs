@@ -53,11 +53,11 @@ def fetch_and_save_race(race_number):
 
 
 def fetch_and_save_all_races_up_to(race_number):
-    print(f"Fetching and saving all races up to race number {race_number}")
+    print(f"Fetching and saving all races up to race number {race_number}\n")
     for race_number in range(1, race_number + 1):
         try:
             fetch_and_save_race(race_number)
         except RaceFetchForbiddenError:
             print(f"  Race {race_number}: Forbidden, stopping fetching.")
             break
-    print("Done!\n")
+    print("\nDone!\n")
