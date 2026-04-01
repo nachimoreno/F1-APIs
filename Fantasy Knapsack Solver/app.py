@@ -108,7 +108,9 @@ def build_lineups_dataframe(lineups: list[dict]) -> pd.DataFrame:
                 "Historical Total": lineup["historical_total_points"],
                 "Total Cost": lineup["total_cost"],
                 "Overlap DNF Penalty": lineup.get("overlap_dnf_penalty"),
-                "Adjusted Projected Total": lineup.get("adjusted_projected_total_score"),
+                "Adjusted Projected Total": lineup.get(
+                    "adjusted_projected_total_score"
+                ),
             }
         )
 
@@ -124,13 +126,19 @@ def render_single_lineup_card(
         st.subheader(title)
 
         if show_overlap_metrics:
-            metric_column_1, metric_column_2, metric_column_3, metric_column_4, metric_column_5 = st.columns(
-                5
-            )
+            (
+                metric_column_1,
+                metric_column_2,
+                metric_column_3,
+                metric_column_4,
+                metric_column_5,
+            ) = st.columns(5)
             metric_column_1.metric("Projected Total", lineup["projected_total_score"])
             metric_column_2.metric(
                 "Adj. Projected",
-                lineup.get("adjusted_projected_total_score", lineup["projected_total_score"]),
+                lineup.get(
+                    "adjusted_projected_total_score", lineup["projected_total_score"]
+                ),
             )
             metric_column_3.metric(
                 "Risk Adjusted", lineup["lineup_risk_adjusted_score"]

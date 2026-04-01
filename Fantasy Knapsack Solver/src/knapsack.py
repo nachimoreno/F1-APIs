@@ -232,7 +232,9 @@ def find_best_lineups(
 def _overlap_dnf_penalty(reference_lineup, candidate_lineup, driver_info, team_info):
     penalty = 0.0
 
-    repeated_drivers = set(reference_lineup["drivers"]) & set(candidate_lineup["drivers"])
+    repeated_drivers = set(reference_lineup["drivers"]) & set(
+        candidate_lineup["drivers"]
+    )
     repeated_teams = set(reference_lineup["teams"]) & set(candidate_lineup["teams"])
 
     for driver_name in repeated_drivers:
