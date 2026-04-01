@@ -2,7 +2,7 @@ import altair as alt
 import pandas as pd
 import streamlit as st
 from src.fetch_results import fetch_and_save_all_races_up_to
-from src.knapsack import find_best_lineups
+from src.knapsack import find_best_two_team_lineups
 
 st.set_page_config(
     page_title="F1 Fantasy Solver",
@@ -93,9 +93,9 @@ def build_team_summary_dataframe(team_info: dict, risk_penalty: float) -> pd.Dat
     )
 
 
-def build_lineups_dataframe(best_lineups: list[dict]) -> pd.DataFrame:
+def build_lineups_dataframe(lineups: list[dict]) -> pd.DataFrame:
     lineup_rows = []
-    for lineup_index, lineup in enumerate(best_lineups, start=1):
+    for lineup_index, lineup in enumerate(lineups, start=1):
         lineup_rows.append(
             {
                 "Lineup Rank": lineup_index,
@@ -107,21 +107,43 @@ def build_lineups_dataframe(best_lineups: list[dict]) -> pd.DataFrame:
                 "Risk Adjusted": lineup["lineup_risk_adjusted_score"],
                 "Historical Total": lineup["historical_total_points"],
                 "Total Cost": lineup["total_cost"],
+                "Overlap DNF Penalty": lineup.get("overlap_dnf_penalty"),
+                "Adjusted Projected Total": lineup.get("adjusted_projected_total_score"),
             }
         )
 
     return pd.DataFrame(lineup_rows)
 
 
-def render_lineup_cards(best_lineups: list[dict]) -> None:
-    if not best_lineups:
-        st.warning("No valid lineups were found for the selected constraints.")
-        return
+def render_single_lineup_card(
+    lineup: dict,
+    title: str,
+    show_overlap_metrics: bool = False,
+) -> None:
+    with st.container(border=True):
+        st.subheader(title)
 
-    for lineup_index, lineup in enumerate(best_lineups, start=1):
-        with st.container(border=True):
-            st.subheader(f"Lineup #{lineup_index}")
+        if show_overlap_metrics:
+            metric_column_1, metric_column_2, metric_column_3, metric_column_4, metric_column_5 = st.columns(
+                5
+            )
+            metric_column_1.metric("Projected Total", lineup["projected_total_score"])
+            metric_column_2.metric(
+                "Adj. Projected",
+                lineup.get("adjusted_projected_total_score", lineup["projected_total_score"]),
+            )
+            metric_column_3.metric(
+                "Risk Adjusted", lineup["lineup_risk_adjusted_score"]
+            )
+            metric_column_4.metric(
+                "Historical Total", lineup["historical_total_points"]
+            )
+            metric_column_5.metric("Total Cost", lineup["total_cost"])
 
+            overlap_penalty = lineup.get("overlap_dnf_penalty")
+            if overlap_penalty is not None:
+                st.caption(f"Overlap DNF penalty applied: {overlap_penalty}")
+        else:
             metric_column_1, metric_column_2, metric_column_3, metric_column_4 = (
                 st.columns(4)
             )
@@ -134,21 +156,50 @@ def render_lineup_cards(best_lineups: list[dict]) -> None:
             )
             metric_column_4.metric("Total Cost", lineup["total_cost"])
 
-            details_column_1, details_column_2 = st.columns(2)
-            with details_column_1:
-                st.markdown("**Drivers**")
-                for driver_name in lineup["drivers"]:
-                    two_x_suffix = (
-                        " **(2x)**" if driver_name == lineup["two_x_driver"] else ""
-                    )
-                    st.markdown(f"- {driver_name}{two_x_suffix}")
+        details_column_1, details_column_2 = st.columns(2)
+        with details_column_1:
+            st.markdown("**Drivers**")
+            for driver_name in lineup["drivers"]:
+                two_x_suffix = (
+                    " **(2x)**" if driver_name == lineup["two_x_driver"] else ""
+                )
+                st.markdown(f"- {driver_name}{two_x_suffix}")
 
-            with details_column_2:
-                st.markdown("**Constructors**")
-                for team_name in lineup["teams"]:
-                    st.markdown(f"- {team_name}")
+        with details_column_2:
+            st.markdown("**Constructors**")
+            for team_name in lineup["teams"]:
+                st.markdown(f"- {team_name}")
 
-            st.caption(f"2x bonus contribution: {lineup['two_x_bonus']}")
+        st.caption(f"2x bonus contribution: {lineup['two_x_bonus']}")
+
+
+def render_two_team_lineup_cards(
+    first_lineups: list[dict],
+    second_lineups: list[dict],
+) -> None:
+    if not first_lineups:
+        st.warning("No valid lineups were found for the selected constraints.")
+        return
+
+    for lineup_index, first_lineup in enumerate(first_lineups, start=1):
+        second_lineup = second_lineups[lineup_index - 1]
+
+        st.markdown(f"### Lineup Pair #{lineup_index}")
+        first_team_column, second_team_column = st.columns(2)
+
+        with first_team_column:
+            render_single_lineup_card(
+                lineup=first_lineup,
+                title="Team 1",
+                show_overlap_metrics=False,
+            )
+
+        with second_team_column:
+            render_single_lineup_card(
+                lineup=second_lineup,
+                title="Team 2",
+                show_overlap_metrics=True,
+            )
 
 
 st.title("🏎️ F1 Fantasy Solver")
@@ -179,7 +230,7 @@ with st.sidebar:
         max_value=10,
         value=1,
         step=1,
-        help="Number of best lineups to return.",
+        help="Number of best lineup pairs to return.",
     )
 
     try:
@@ -214,20 +265,23 @@ if run_solver:
             st.write("Fetching data from fantasy.formula1.com...")
             fetch_and_save_all_races_up_to(24)
 
-            st.write("Computing best lineups...")
-            driver_info, team_info, best_lineups = find_best_lineups(
-                excluded_drivers=exclude_drivers,
-                excluded_teams=exclude_teams,
-                budget=float(budget),
-                top_n=int(top_n),
-                risk_penalty=float(risk_penalty),
-                verbosity=0,
+            st.write("Computing best two-team lineups...")
+            driver_info, team_info, first_lineups, second_lineups = (
+                find_best_two_team_lineups(
+                    excluded_drivers=exclude_drivers,
+                    excluded_teams=exclude_teams,
+                    budget=float(budget),
+                    top_n=int(top_n),
+                    risk_penalty=float(risk_penalty),
+                    verbosity=0,
+                )
             )
 
             st.session_state.solver_results = {
                 "driver_info": driver_info,
                 "team_info": team_info,
-                "best_lineups": best_lineups,
+                "first_lineups": first_lineups,
+                "second_lineups": second_lineups,
                 "risk_penalty": float(risk_penalty),
                 "budget": float(budget),
                 "excluded_drivers": exclude_drivers,
@@ -249,13 +303,14 @@ if solver_results is None:
 else:
     driver_info = solver_results["driver_info"]
     team_info = solver_results["team_info"]
-    best_lineups = solver_results["best_lineups"]
+    first_lineups = solver_results["first_lineups"]
+    second_lineups = solver_results["second_lineups"]
     selected_risk_penalty = solver_results["risk_penalty"]
 
     summary_column_1, summary_column_2, summary_column_3, summary_column_4 = st.columns(
         4
     )
-    summary_column_1.metric("Returned Lineups", len(best_lineups))
+    summary_column_1.metric("Returned Lineup Pairs", len(first_lineups))
     summary_column_2.metric("Budget", round(solver_results["budget"], 2))
     summary_column_3.metric("Excluded Drivers", len(solver_results["excluded_drivers"]))
     summary_column_4.metric(
@@ -267,7 +322,26 @@ else:
     )
 
     with lineups_tab:
-        render_lineup_cards(best_lineups)
+        render_two_team_lineup_cards(first_lineups, second_lineups)
+
+        with st.expander("Show lineup tables"):
+            team_1_dataframe, team_2_dataframe = st.columns(2)
+
+            with team_1_dataframe:
+                st.markdown("**Team 1 lineups**")
+                st.dataframe(
+                    build_lineups_dataframe(first_lineups),
+                    use_container_width=True,
+                    hide_index=True,
+                )
+
+            with team_2_dataframe:
+                st.markdown("**Team 2 lineups**")
+                st.dataframe(
+                    build_lineups_dataframe(second_lineups),
+                    use_container_width=True,
+                    hide_index=True,
+                )
 
     with drivers_tab:
         driver_summary_dataframe = build_driver_summary_dataframe(
