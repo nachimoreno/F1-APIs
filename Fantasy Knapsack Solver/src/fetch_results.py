@@ -113,20 +113,31 @@ def get_driver_and_team_info(verbose=False):
                         )
                         # DNF logic
                         for session in player["SessionWisePoints"]:
-                            session_points_diff = session["points"] - session["nonegative_points"]
-                            if session["sessiontype"] == "Qualifying" and session_points_diff <= -5:
+                            session_points_diff = (
+                                session["points"] - session["nonegative_points"]
+                            )
+                            if (
+                                session["sessiontype"] == "Qualifying"
+                                and session_points_diff <= -5
+                            ):
                                 driver_info[driver_name]["dnq"].append(-5)
                             else:
                                 driver_info[driver_name]["dnq"].append(0)
-                            if session["sessiontype"] == "Sprint Qualifying" and session_points_diff <= -10:
+                            if (
+                                session["sessiontype"] == "Sprint Qualifying"
+                                and session_points_diff <= -10
+                            ):
                                 driver_info[driver_name]["dnf_sprint"].append(-10)
                             else:
                                 driver_info[driver_name]["dnf_sprint"].append(0)
-                            if session["sessiontype"] == "Race" and session_points_diff <= -20:
+                            if (
+                                session["sessiontype"] == "Race"
+                                and session_points_diff <= -20
+                            ):
                                 driver_info[driver_name]["dnf_race"].append(-20)
                             else:
                                 driver_info[driver_name]["dnf_race"].append(0)
-                            
+
                     # Except cost, which we always want the latest
                     driver_info[driver_name]["cost"] = float(player["Value"])
 
@@ -143,8 +154,14 @@ def get_driver_and_team_info(verbose=False):
 
     # Calculate average points loss to DNFs for each driver and team
     for driver_name in driver_info:
-        driver_info[driver_name]["avg_dnf_loss"] = (sum(driver_info[driver_name]["dnq"]) + sum(driver_info[driver_name]["dnf_sprint"]) + sum(driver_info[driver_name]["dnf_race"])) / len(driver_info[driver_name]["points"])
+        driver_info[driver_name]["avg_dnf_loss"] = (
+            sum(driver_info[driver_name]["dnq"])
+            + sum(driver_info[driver_name]["dnf_sprint"])
+            + sum(driver_info[driver_name]["dnf_race"])
+        ) / len(driver_info[driver_name]["points"])
         driver_team = driver_info[driver_name]["team"]
-        team_info[driver_team]["avg_dnf_loss"] += driver_info[driver_name]["avg_dnf_loss"]
+        team_info[driver_team]["avg_dnf_loss"] += driver_info[driver_name][
+            "avg_dnf_loss"
+        ]
 
     return driver_info, team_info
