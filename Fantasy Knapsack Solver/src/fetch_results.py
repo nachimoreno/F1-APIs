@@ -19,17 +19,6 @@ def fetch_and_save_race(race_number):
 
     url = f"https://fantasy.formula1.com/feeds/drivers/{race_number}_en.json"
 
-
-def fetch_and_save_race(race_number):
-    os.makedirs(DATA_DIR, exist_ok=True)
-
-    output_path = DATA_DIR / f"drivers_{race_number}_en.json"
-    if output_path.exists():
-        print(f"  Race {race_number}: File already exists, skipping.")
-        return
-
-    url = f"https://fantasy.formula1.com/feeds/drivers/{race_number}_en.json"
-
     try:
         response = requests.get(url, timeout=30)
         response.raise_for_status()
