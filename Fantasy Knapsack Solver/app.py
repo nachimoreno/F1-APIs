@@ -50,6 +50,7 @@ def build_driver_summary_dataframe(
                 ),
                 "Historical Total": round(total_points(points_by_session), 2),
                 "Races Counted": len(points_by_session),
+                "Average DNF Loss": round(driver_values["avg_dnf_loss"], 2),
             }
         )
 
@@ -82,6 +83,7 @@ def build_team_summary_dataframe(team_info: dict, risk_penalty: float) -> pd.Dat
                 ),
                 "Historical Total": round(total_points(points_by_session), 2),
                 "Races Counted": len(points_by_session),
+                "Average DNF Loss": round(team_values["avg_dnf_loss"], 2),
             }
         )
 
@@ -158,7 +160,7 @@ with st.sidebar:
         "Budget",
         min_value=0.0,
         value=100.0,
-        step=0.5,
+        step=0.1,
         help="Budget available for the lineup.",
     )
 
@@ -174,8 +176,8 @@ with st.sidebar:
     top_n = st.number_input(
         "Top N Lineups",
         min_value=1,
-        max_value=50,
-        value=3,
+        max_value=10,
+        value=1,
         step=1,
         help="Number of best lineups to return.",
     )
@@ -237,6 +239,7 @@ if run_solver:
     except Exception as error:
         st.session_state.solver_results = None
         st.error(f"Solver run failed: {error}")
+        raise error
 
 
 solver_results = st.session_state.solver_results
@@ -253,7 +256,7 @@ else:
         4
     )
     summary_column_1.metric("Returned Lineups", len(best_lineups))
-    summary_column_2.metric("Budget", solver_results["budget"])
+    summary_column_2.metric("Budget", round(solver_results["budget"], 2))
     summary_column_3.metric("Excluded Drivers", len(solver_results["excluded_drivers"]))
     summary_column_4.metric(
         "Excluded Constructors", len(solver_results["excluded_teams"])
