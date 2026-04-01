@@ -1,5 +1,12 @@
-from .knapsack import total_points, average_points, standard_deviation, risk_adjusted_points
 import time
+
+from .knapsack import (
+    average_points,
+    risk_adjusted_points,
+    standard_deviation,
+    total_points,
+)
+
 
 def display_results(driver_info, team_info, best_lineups, risk_penalty, verbose=False):
     if verbose:
@@ -13,10 +20,11 @@ def display_results(driver_info, team_info, best_lineups, risk_penalty, verbose=
         for driver in lineup["drivers"]:
             driver_total_points = total_points(driver_info[driver]["points"])
             driver_average_points = average_points(driver_info[driver]["points"])
-            driver_standard_deviation = standard_deviation(driver_info[driver]["points"])
+            driver_standard_deviation = standard_deviation(
+                driver_info[driver]["points"]
+            )
             driver_risk_adjusted_score = risk_adjusted_points(
-                driver_info[driver]["points"],
-                risk_penalty
+                driver_info[driver]["points"], risk_penalty
             )
             print(
                 f"  - {driver} "
@@ -33,8 +41,7 @@ def display_results(driver_info, team_info, best_lineups, risk_penalty, verbose=
             team_average_points = average_points(team_info[team]["points"])
             team_standard_deviation = standard_deviation(team_info[team]["points"])
             team_risk_adjusted_score = risk_adjusted_points(
-                team_info[team]["points"],
-                risk_penalty
+                team_info[team]["points"], risk_penalty
             )
             print(
                 f"  - {team} "

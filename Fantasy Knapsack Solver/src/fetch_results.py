@@ -1,13 +1,16 @@
 import json
-from pathlib import Path
-import requests
 import os
+from pathlib import Path
+
+import requests
 
 LOCAL_ROOT = Path(__file__).parent.parent
 DATA_DIR = LOCAL_ROOT / "data"
 
+
 class RaceFetchForbiddenError(Exception):
     pass
+
 
 def fetch_and_save_race(race_number):
     os.makedirs(DATA_DIR, exist_ok=True)
@@ -43,10 +46,66 @@ def fetch_and_save_race(race_number):
 
 def fetch_and_save_all_races_up_to(race_number):
     print(f"Fetching and saving all races up to race number {race_number}\n")
-    for race_number in range(1, race_number + 1):
+    for race_num in range(1, race_number + 1):
         try:
-            fetch_and_save_race(race_number)
+            fetch_and_save_race(race_num)
         except RaceFetchForbiddenError:
-            print(f"  Race {race_number}: Forbidden, stopping fetching.")
+            print(f"  Race {race_num}: Forbidden, stopping fetching.")
             break
     print("\nDone!\n")
+
+
+def get_driver_and_team_info(verbose=False):
+    if verbose:
+        print("Getting driver and team info...")
+
+    driver_info = {}
+    team_info = {}
+
+    # Set up driver info dictionary with driver names as keys
+    # and cost and points as values
+    with open(DATA_DIR / "drivers_1_en.json", encoding="utf-8") as file:
+        if verbose:
+            print("Building dictionaries...")
+
+        data = json.load(file)
+
+        for player in data["Data"]["Value"]:
+            if player["PositionName"] == "DRIVER":
+                driver_name = player["FUllName"]
+                driver_info[driver_name] = {
+                    "points": [],
+                    "cost": 0,
+                }
+
+            if player["PositionName"] == "CONSTRUCTOR":
+                driver_team = player["FUllName"]
+                team_info[driver_team] = {
+                    "points": [],
+                    "cost": 0,
+                }
+
+    # Add points to driver info dictionary
+    for file_path in DATA_DIR.glob("drivers_*.json"):
+        if verbose:
+            print(f"Processing {file_path}...")
+
+        with open(file_path, encoding="utf-8") as file:
+            data = json.load(file)
+
+            for player in data["Data"]["Value"]:
+                if player["PositionName"] == "DRIVER":
+                    driver_name = player["FUllName"]
+                    driver_info[driver_name]["points"].append(
+                        float(player["GamedayPoints"])
+                    )
+                    driver_info[driver_name]["cost"] = float(player["Value"])
+
+                if player["PositionName"] == "CONSTRUCTOR":
+                    driver_team = player["FUllName"]
+                    team_info[driver_team]["points"].append(
+                        float(player["GamedayPoints"])
+                    )
+                    team_info[driver_team]["cost"] = float(player["Value"])
+
+    return driver_info, team_info

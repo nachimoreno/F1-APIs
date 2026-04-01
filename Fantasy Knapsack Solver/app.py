@@ -1,12 +1,8 @@
-from pathlib import Path
-
 import altair as alt
 import pandas as pd
 import streamlit as st
-
 from src.fetch_results import fetch_and_save_all_races_up_to
 from src.knapsack import find_best_lineups
-
 
 st.set_page_config(
     page_title="F1 Fantasy Solver",
@@ -21,7 +17,7 @@ def load_available_options() -> tuple[list[str], list[str]]:
     Load a broad set of available driver and constructor names from the local data
     so the exclusion multiselects can be populated before a solve is run.
     """
-    from src.knapsack import get_driver_and_team_info
+    from src.fetch_results import get_driver_and_team_info
 
     driver_info, team_info = get_driver_and_team_info()
     available_drivers = sorted(driver_info.keys())
@@ -30,8 +26,15 @@ def load_available_options() -> tuple[list[str], list[str]]:
 
 
 @st.cache_data(show_spinner=False)
-def build_driver_summary_dataframe(driver_info: dict, risk_penalty: float) -> pd.DataFrame:
-    from src.knapsack import average_points, standard_deviation, risk_adjusted_points, total_points
+def build_driver_summary_dataframe(
+    driver_info: dict, risk_penalty: float
+) -> pd.DataFrame:
+    from src.knapsack import (
+        average_points,
+        risk_adjusted_points,
+        standard_deviation,
+        total_points,
+    )
 
     driver_rows = []
     for driver_name, driver_values in driver_info.items():
@@ -42,19 +45,28 @@ def build_driver_summary_dataframe(driver_info: dict, risk_penalty: float) -> pd
                 "Cost": round(driver_values["cost"], 1),
                 "Average Points": round(average_points(points_by_session), 2),
                 "Std Dev": round(standard_deviation(points_by_session), 2),
-                "Risk Adjusted": round(risk_adjusted_points(points_by_session, risk_penalty), 2),
+                "Risk Adjusted": round(
+                    risk_adjusted_points(points_by_session, risk_penalty), 2
+                ),
                 "Historical Total": round(total_points(points_by_session), 2),
                 "Races Counted": len(points_by_session),
             }
         )
 
     driver_dataframe = pd.DataFrame(driver_rows)
-    return driver_dataframe.sort_values(by="Risk Adjusted", ascending=False).reset_index(drop=True)
+    return driver_dataframe.sort_values(
+        by="Risk Adjusted", ascending=False
+    ).reset_index(drop=True)
 
 
 @st.cache_data(show_spinner=False)
 def build_team_summary_dataframe(team_info: dict, risk_penalty: float) -> pd.DataFrame:
-    from src.knapsack import average_points, standard_deviation, risk_adjusted_points, total_points
+    from src.knapsack import (
+        average_points,
+        risk_adjusted_points,
+        standard_deviation,
+        total_points,
+    )
 
     team_rows = []
     for team_name, team_values in team_info.items():
@@ -65,14 +77,18 @@ def build_team_summary_dataframe(team_info: dict, risk_penalty: float) -> pd.Dat
                 "Cost": round(team_values["cost"], 1),
                 "Average Points": round(average_points(points_by_session), 2),
                 "Std Dev": round(standard_deviation(points_by_session), 2),
-                "Risk Adjusted": round(risk_adjusted_points(points_by_session, risk_penalty), 2),
+                "Risk Adjusted": round(
+                    risk_adjusted_points(points_by_session, risk_penalty), 2
+                ),
                 "Historical Total": round(total_points(points_by_session), 2),
                 "Races Counted": len(points_by_session),
             }
         )
 
     team_dataframe = pd.DataFrame(team_rows)
-    return team_dataframe.sort_values(by="Risk Adjusted", ascending=False).reset_index(drop=True)
+    return team_dataframe.sort_values(by="Risk Adjusted", ascending=False).reset_index(
+        drop=True
+    )
 
 
 def build_lineups_dataframe(best_lineups: list[dict]) -> pd.DataFrame:
@@ -104,17 +120,25 @@ def render_lineup_cards(best_lineups: list[dict]) -> None:
         with st.container(border=True):
             st.subheader(f"Lineup #{lineup_index}")
 
-            metric_column_1, metric_column_2, metric_column_3, metric_column_4 = st.columns(4)
+            metric_column_1, metric_column_2, metric_column_3, metric_column_4 = (
+                st.columns(4)
+            )
             metric_column_1.metric("Projected Total", lineup["projected_total_score"])
-            metric_column_2.metric("Risk Adjusted", lineup["lineup_risk_adjusted_score"])
-            metric_column_3.metric("Historical Total", lineup["historical_total_points"])
+            metric_column_2.metric(
+                "Risk Adjusted", lineup["lineup_risk_adjusted_score"]
+            )
+            metric_column_3.metric(
+                "Historical Total", lineup["historical_total_points"]
+            )
             metric_column_4.metric("Total Cost", lineup["total_cost"])
 
             details_column_1, details_column_2 = st.columns(2)
             with details_column_1:
                 st.markdown("**Drivers**")
                 for driver_name in lineup["drivers"]:
-                    two_x_suffix = " **(2x)**" if driver_name == lineup["two_x_driver"] else ""
+                    two_x_suffix = (
+                        " **(2x)**" if driver_name == lineup["two_x_driver"] else ""
+                    )
                     st.markdown(f"- {driver_name}{two_x_suffix}")
 
             with details_column_2:
@@ -207,7 +231,9 @@ if run_solver:
                 "excluded_drivers": exclude_drivers,
                 "excluded_teams": exclude_teams,
             }
-            solver_status.update(label="Solver complete", state="complete", expanded=False)
+            solver_status.update(
+                label="Solver complete", state="complete", expanded=False
+            )
     except Exception as error:
         st.session_state.solver_results = None
         st.error(f"Solver run failed: {error}")
@@ -223,34 +249,35 @@ else:
     best_lineups = solver_results["best_lineups"]
     selected_risk_penalty = solver_results["risk_penalty"]
 
-    summary_column_1, summary_column_2, summary_column_3, summary_column_4 = st.columns(4)
+    summary_column_1, summary_column_2, summary_column_3, summary_column_4 = st.columns(
+        4
+    )
     summary_column_1.metric("Returned Lineups", len(best_lineups))
     summary_column_2.metric("Budget", solver_results["budget"])
     summary_column_3.metric("Excluded Drivers", len(solver_results["excluded_drivers"]))
-    summary_column_4.metric("Excluded Constructors", len(solver_results["excluded_teams"]))
+    summary_column_4.metric(
+        "Excluded Constructors", len(solver_results["excluded_teams"])
+    )
 
     lineups_tab, drivers_tab, constructors_tab = st.tabs(
         ["Best Lineups", "Driver Model View", "Constructor Model View"]
     )
 
     with lineups_tab:
-        # lineups_dataframe = build_lineups_dataframe(best_lineups)
-
-        # if not lineups_dataframe.empty:
-            # st.dataframe(lineups_dataframe, use_container_width=True, hide_index=True)
-
-            # chart_dataframe = lineups_dataframe[["Lineup Rank", "Projected Total", "Risk Adjusted", "Historical Total"]].copy()
-            # chart_dataframe = chart_dataframe.set_index("Lineup Rank")
-            # st.bar_chart(chart_dataframe)
-
         render_lineup_cards(best_lineups)
 
     with drivers_tab:
-        driver_summary_dataframe = build_driver_summary_dataframe(driver_info, selected_risk_penalty)
+        driver_summary_dataframe = build_driver_summary_dataframe(
+            driver_info, selected_risk_penalty
+        )
 
-        st.dataframe(driver_summary_dataframe, use_container_width=True, hide_index=True)
+        st.dataframe(
+            driver_summary_dataframe, use_container_width=True, hide_index=True
+        )
 
-        chart_dataframe = driver_summary_dataframe[["Driver", "Average Points", "Risk Adjusted"]]
+        chart_dataframe = driver_summary_dataframe[
+            ["Driver", "Average Points", "Risk Adjusted"]
+        ]
 
         chart = (
             alt.Chart(chart_dataframe)
@@ -275,10 +302,14 @@ else:
         st.altair_chart(chart, use_container_width=True)
 
     with constructors_tab:
-        team_summary_dataframe = build_team_summary_dataframe(team_info, selected_risk_penalty)
+        team_summary_dataframe = build_team_summary_dataframe(
+            team_info, selected_risk_penalty
+        )
         st.dataframe(team_summary_dataframe, use_container_width=True, hide_index=True)
-        
-        chart_dataframe = team_summary_dataframe[["Constructor", "Average Points", "Risk Adjusted"]]
+
+        chart_dataframe = team_summary_dataframe[
+            ["Constructor", "Average Points", "Risk Adjusted"]
+        ]
 
         chart = (
             alt.Chart(chart_dataframe)
