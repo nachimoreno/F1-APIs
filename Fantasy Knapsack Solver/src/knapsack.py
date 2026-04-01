@@ -54,14 +54,13 @@ def best_2x_driver(selected_drivers, driver_info, risk_penalty, verbose=False):
     )
 
 
-def find_best_lineups(
+def _build_valid_lineups(
     excluded_drivers=None,
     excluded_teams=None,
     budget=100.0,
-    top_n=3,
     risk_penalty=0.5,
     verbosity=0,
-) -> list[dict]:
+):
     driver_info, team_info = get_driver_and_team_info()
 
     if excluded_drivers:
@@ -110,7 +109,7 @@ def find_best_lineups(
     )
 
     if verbosity > 0:
-        print("DEBUG: find_best_lineups() produced:")
+        print("DEBUG: _build_valid_lineups() produced:")
         print(f"  Driver info: {driver_info}")
         print(f"  Team info: {team_info}")
 
@@ -209,4 +208,115 @@ def find_best_lineups(
         reverse=True,
     )
 
-    return (driver_info, team_info, valid_lineups[:top_n])
+    return driver_info, team_info, valid_lineups
+
+
+def find_best_lineups(
+    excluded_drivers=None,
+    excluded_teams=None,
+    budget=100.0,
+    top_n=3,
+    risk_penalty=0.5,
+    verbosity=0,
+):
+    driver_info, team_info, valid_lineups = _build_valid_lineups(
+        excluded_drivers=excluded_drivers,
+        excluded_teams=excluded_teams,
+        budget=budget,
+        risk_penalty=risk_penalty,
+        verbosity=verbosity,
+    )
+    return driver_info, team_info, valid_lineups[:top_n]
+
+
+def _overlap_dnf_penalty(reference_lineup, candidate_lineup, driver_info, team_info):
+    penalty = 0.0
+
+    repeated_drivers = set(reference_lineup["drivers"]) & set(candidate_lineup["drivers"])
+    repeated_teams = set(reference_lineup["teams"]) & set(candidate_lineup["teams"])
+
+    for driver_name in repeated_drivers:
+        # avg_dnf_loss is stored as a negative number in fetch_results.py
+        penalty += abs(driver_info[driver_name]["avg_dnf_loss"])
+
+    for team_name in repeated_teams:
+        # team avg_dnf_loss is also accumulated as a negative number
+        penalty += abs(team_info[team_name]["avg_dnf_loss"])
+
+    return penalty
+
+
+def _build_second_lineup(reference_lineup, all_valid_lineups, driver_info, team_info):
+    rescored_lineups = []
+
+    for candidate_lineup in all_valid_lineups:
+        overlap_penalty = _overlap_dnf_penalty(
+            reference_lineup=reference_lineup,
+            candidate_lineup=candidate_lineup,
+            driver_info=driver_info,
+            team_info=team_info,
+        )
+
+        adjusted_projected_total_score = (
+            candidate_lineup["projected_total_score"] - overlap_penalty
+        )
+
+        rescored_lineups.append(
+            {
+                **candidate_lineup,
+                "overlap_dnf_penalty": round(overlap_penalty, 2),
+                "adjusted_projected_total_score": round(
+                    adjusted_projected_total_score, 2
+                ),
+            }
+        )
+
+    rescored_lineups.sort(
+        key=lambda lineup: (
+            lineup["adjusted_projected_total_score"],
+            lineup["lineup_risk_adjusted_score"],
+            lineup["historical_total_points"],
+        ),
+        reverse=True,
+    )
+
+    return rescored_lineups[0]
+
+
+def find_best_two_team_lineups(
+    excluded_drivers=None,
+    excluded_teams=None,
+    budget=100.0,
+    top_n=3,
+    risk_penalty=0.5,
+    verbosity=0,
+):
+    driver_info, team_info, first_lineups = find_best_lineups(
+        excluded_drivers=excluded_drivers,
+        excluded_teams=excluded_teams,
+        budget=budget,
+        top_n=top_n,
+        risk_penalty=risk_penalty,
+        verbosity=verbosity,
+    )
+
+    _, _, all_valid_lineups = _build_valid_lineups(
+        excluded_drivers=excluded_drivers,
+        excluded_teams=excluded_teams,
+        budget=budget,
+        risk_penalty=risk_penalty,
+        verbosity=verbosity,
+    )
+
+    second_lineups = []
+
+    for first_lineup in first_lineups:
+        second_lineup = _build_second_lineup(
+            reference_lineup=first_lineup,
+            all_valid_lineups=all_valid_lineups,
+            driver_info=driver_info,
+            team_info=team_info,
+        )
+        second_lineups.append(second_lineup)
+
+    return driver_info, team_info, first_lineups, second_lineups
