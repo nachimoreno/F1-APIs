@@ -91,9 +91,14 @@ def get_driver_and_team_info(verbose=False):
                 }
 
     # Add value, points, dnfs, and dnqs to driver info dictionary
-    num_fetched_races = len(list(DATA_DIR.glob("drivers_*.json")))
+    # Sort file paths to ensure that the last race is always the one left out
+    file_paths = sorted(
+        DATA_DIR.glob("drivers_*_en.json"),
+        key=lambda path: int(path.stem.split("_")[1]),
+    )
+    num_fetched_races = len(file_paths)
     count_race = 0
-    for file_path in DATA_DIR.glob("drivers_*.json"):
+    for file_path in file_paths:
         if verbose:
             print(f"Processing {file_path}...")
 

@@ -95,10 +95,18 @@ def find_best_lineups(
                 exit(1)
 
     driver_info = dict(
-        sorted(driver_info.items(), key=lambda x: x[1]["points"], reverse=True)
+        sorted(
+            driver_info.items(),
+            key=lambda x: total_points(x[1]["points"]),
+            reverse=True,
+        )
     )
     team_info = dict(
-        sorted(team_info.items(), key=lambda x: x[1]["points"], reverse=True)
+        sorted(
+            team_info.items(),
+            key=lambda x: total_points(x[1]["points"]),
+            reverse=True,
+        )
     )
 
     if verbosity > 0:
