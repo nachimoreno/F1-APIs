@@ -332,25 +332,6 @@ else:
     with lineups_tab:
         render_two_team_lineup_cards(first_lineups, second_lineups)
 
-        with st.expander("Show lineup tables"):
-            team_1_dataframe, team_2_dataframe = st.columns(2)
-
-            with team_1_dataframe:
-                st.markdown("**Team 1 lineups**")
-                st.dataframe(
-                    build_lineups_dataframe(first_lineups),
-                    use_container_width=True,
-                    hide_index=True,
-                )
-
-            with team_2_dataframe:
-                st.markdown("**Team 2 lineups**")
-                st.dataframe(
-                    build_lineups_dataframe(second_lineups),
-                    use_container_width=True,
-                    hide_index=True,
-                )
-
     with drivers_tab:
         driver_summary_dataframe = build_driver_summary_dataframe(
             driver_info, selected_risk_penalty
