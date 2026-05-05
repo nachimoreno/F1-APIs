@@ -1,3 +1,4 @@
 *.pyc
 .DS_Store
 Fantasy Knapsack Solver/data/*.json
+interesting_urls.txt

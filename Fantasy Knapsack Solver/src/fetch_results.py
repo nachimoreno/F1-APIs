@@ -96,6 +96,30 @@ def get_driver_and_team_info(verbose=False):
         DATA_DIR.glob("drivers_*_en.json"),
         key=lambda path: int(path.stem.split("_")[1]),
     )
+
+    valid_file_paths = []
+    for file_path in file_paths:
+        try:
+            with open(file_path, encoding="utf-8") as file:
+                data = json.load(file)
+            
+            if (
+                "Data" in data
+                and "Value" in data["Data"]
+                and isinstance(data["Data"]["Value"], list)
+                and len(data["Data"]["Value"]) >= 1
+            ):
+                valid_file_paths.append(file_path)
+            else:
+                if verbose:
+                    print(f"File {file_path} is invalid or empty. Deleting...")
+                file_path.unlink()
+        except Exception as e:
+            if verbose:
+                print(f"Error reading {file_path}: {e}. Deleting...")
+            file_path.unlink()
+
+    file_paths = valid_file_paths
     num_fetched_races = len(file_paths)
     count_race = 0
     for file_path in file_paths:
