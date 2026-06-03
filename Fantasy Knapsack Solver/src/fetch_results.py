@@ -12,6 +12,37 @@ class RaceFetchForbiddenError(Exception):
     pass
 
 
+def _race_number(path):
+    return int(path.stem.split("_")[1])
+
+
+def _feed_has_null_points(data):
+    """Return True if any driver/constructor in the feed has missing point
+    values. Null points signal a poorly-formed download rather than a real
+    result, so a feed that contains them should not be trusted."""
+    for player in data["Data"]["Value"]:
+        position = player["PositionName"]
+        if position in ("DRIVER", "CONSTRUCTOR"):
+            if player["GamedayPoints"] is None:
+                return True
+        if position == "DRIVER":
+            for session in player.get("SessionWisePoints", []):
+                if session["points"] is None or session["nonegative_points"] is None:
+                    return True
+    return False
+
+
+def _feed_file_has_null_points(file_path):
+    try:
+        with open(file_path, encoding="utf-8") as file:
+            data = json.load(file)
+        return _feed_has_null_points(data)
+    except (json.JSONDecodeError, KeyError, OSError):
+        # Structurally broken files are handled by the validation pass in
+        # get_driver_and_team_info; don't treat them as null-point feeds here.
+        return False
+
+
 def fetch_and_save_race(race_number):
     os.makedirs(DATA_DIR, exist_ok=True)
 
@@ -44,6 +75,45 @@ def fetch_and_save_race(race_number):
     print(f"  Race {race_number}: Saved JSON to {output_path.resolve()}")
 
 
+def _validate_and_repair_race_feeds():
+    """Check each saved race feed for null point values, which indicate a
+    poorly-formed download. Any flagged feed is deleted and re-downloaded once;
+    if it still has null points afterwards, it is discarded so the analysis only
+    runs on complete data. The latest race is an unscored placeholder, so its
+    null points are expected and it is left untouched."""
+    file_paths = sorted(DATA_DIR.glob("drivers_*_en.json"), key=_race_number)
+    if not file_paths:
+        return
+
+    placeholder_race = _race_number(file_paths[-1])
+
+    for file_path in file_paths:
+        race_num = _race_number(file_path)
+        # The upcoming race has not been scored yet; null points are expected.
+        if race_num == placeholder_race:
+            continue
+        if not _feed_file_has_null_points(file_path):
+            continue
+
+        print(f"  Race {race_num}: null point values found, re-downloading.")
+        file_path.unlink()
+        try:
+            fetch_and_save_race(race_num)
+        except RaceFetchForbiddenError:
+            print(f"  Race {race_num}: Forbidden on re-download, discarding.")
+            continue
+
+        if not file_path.exists():
+            print(f"  Race {race_num}: re-download failed, discarding.")
+            continue
+        if _feed_file_has_null_points(file_path):
+            print(
+                f"  Race {race_num}: still has null point values after "
+                f"re-download, discarding from analysis."
+            )
+            file_path.unlink()
+
+
 def fetch_and_save_all_races_up_to(race_number):
     print(f"Fetching and saving all races up to race number {race_number}\n")
     for race_num in range(1, race_number + 1):
@@ -52,6 +122,9 @@ def fetch_and_save_all_races_up_to(race_number):
         except RaceFetchForbiddenError:
             print(f"  Race {race_num}: Forbidden, stopping fetching.")
             break
+
+    print("\nValidating downloaded race feeds...")
+    _validate_and_repair_race_feeds()
     print("\nDone!\n")
 
 
